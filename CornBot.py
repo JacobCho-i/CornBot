@@ -143,34 +143,57 @@ async def remind_to_error(ctx, error):
     await ctx.send('You have entered wrong parameters! Right format:')
     await ctx.send('.remind_to *SECONDS* *USER* *MESSAGE*')
 
+birthdays = {}
+
 @client.command()
 async def set_bday(ctx, month:int, day:int, user:discord.Member):
     """
-    This command is a command to set a message planned in 00:00 (in current user's timezone)
-    at [month]/[day] to congratulate [user]'s birthday with everyone ping
+    This command is a command to register a user's birthday
 
     Input: ctx, month, day, user
     Output: N/A
     """
-    now = datetime.now()
-
-
-@client.command()
-async def congratulate_bday(ctx):
-    await ctx.send(f"@everyone it is goyang's birthday! Happy Birthday!")
+    date_str = f'{month}/{day}'
+    bday = datetime.strptime(date_str, '%m/%d').date()
+    birthdays[user.id] = bday
+    await ctx.send(f"Successfully set {user.mention}'s birthday!")
 
 @client.command()
-async def set_bday_utc(ctx, month:int, day:int, del_UTC:int, user:discord.Member):
+async def remove_bday(ctx, user:discord.Member):
     """
-    This command is a command to set a message planned in 00:00 (in timezone UTC-[delUTC])
-    at [month]/[day] to congratulate [user]'s birthday with everyone ping
+    This command is a command to remove registered user's birthday
 
-    Input: ctx, month, day, del_UTC, user
+    Input: ctx, month, day, user
     Output: N/A
     """
-    now = datetime.utcnow()
-    current_time = now.strftime("%H:%M:%S")
-    print("Current Time =", current_time)
+    if user.id in birthdays:
+        del birthdays[user.id]
+        await ctx.send(f"Successfully removed {user.mention}'s birthday!")
+    else:
+        await ctx.send("This user's birthday is not registered!")
+        return 
+
+@client.command()
+async def check(ctx, user:discord.Member):
+    """
+    This is prototype function to check bday functionality
+
+    Input: ctx, user
+    Output: N/A
+    """
+    now = datetime.now()
+    if user.id in birthdays:
+        bday = birthdays[user.id]
+        if (bday.month == now.month and bday.day == now.day):
+            await ctx.send(f"happy birthday to {user.mention}!")
+        else:
+            await ctx.send("no birthday today")
+    else:
+        await ctx.send("This user's birthday is not registered!")
+
+@check.error
+async def check_error(ctx, error):
+    print(error)
 
 @set_bday.error
 async def bday_error(ctx, error):
@@ -182,19 +205,5 @@ async def bday_error(ctx, error):
     """
     await ctx.send('You have entered wrong parameters! Right format:')
     await ctx.send('.set_bday *MONTH* *DAY* *USER*')
-
-async def bday_check():
-    await client.wait_until_ready() 
-    while True:
-        now = datetime.now().time()
-        target_time = time(hour=1, minute=19, second=30)
-        if now >= target_time:
-            cmd = client.get_command('congratulate_bday')
-            ctx = await client.get_context(message=None, cls=discord.ext.commands.Context)
-            await cmd.invoke(ctx)
-            target_time += datetime.timedelta(days=1)
-        await asyncio.sleep(60) 
-
-client.loop.create_task(bday_check())
 
 client.run(Token.TOKEN)
