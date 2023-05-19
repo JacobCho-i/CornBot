@@ -1,26 +1,27 @@
 #REMINDER: ANOTHER FILE Token.py IS NEEDED TO RUN THIS
 import discord
-from discord.ext import commands
+from discord import app_commands
 
 import random
 import asyncio
-import Token
+from Token import TOKEN, guild_id
 from datetime import datetime, time 
 
-intents = discord.Intents.default()
-intents.message_content = True
+class aclient(discord.Client):
+    def __init__(self):
+        super().__init__(intents=discord.Intents.default())
+        self.synced = False
+    
+    async def on_ready(self):
+        await self.wait_until_ready()
+        if not self.synced:
+            await tree.sync(guild=discord.Object(id = guild_id))
+            self.synced = True
+        print("successfully logged in!")
 
-client = commands.Bot(command_prefix='.', intents=intents)
-@client.event
-async def on_ready():
-    """
-    This function is called upon the bot successfully logs in
-
-    Input: N/A
-    Output: N/A
-    """
-    print("hi I am online")
-
+client = aclient()
+tree = app_commands.CommandTree(client)
+id = guild_id
 @client.event
 async def on_command_error(ctx, error):
     """
@@ -34,19 +35,19 @@ async def on_command_error(ctx, error):
     else:
         print(f"Error: {error}")
 
-@client.command()
-async def corn(ctx):
+@tree.command(name="corn", description="prints out what this bot does", guild=discord.Object(id = id))
+async def corn(interaction: discord.Interaction):
     """
     This command is a basic command to see what cornbot can do
 
     Input: ctx
     Output: N/A
     """
-    await ctx.send("Hi this is corn bot with some cool functionalities:\nHere is some commands to try:\n.coin \n.dice\n")
-    await ctx.send("You can visit [this link](https://github.com/JacobCho-i/CornBot/blob/main/README.md) for a document with full commands!")
+    await interaction.response.send_message("Hi this is corn bot with some cool functionalities:\nHere is some commands to try:\n.coin \n.dice\n", ephemeral=True)
+    await interaction.response.send_message("You can visit [this link](https://github.com/JacobCho-i/CornBot/blob/main/README.md) for a document with full commands!", ephemeral=True)
 
-@client.command()
-async def coin(ctx):
+@tree.command(name="coin", description="flip a coin and sends the results", guild=discord.Object(id = id))
+async def coin(interaction: discord.Interaction):
     """
     This command is a command to flip a coin and sends the results [HEAD/TAIL]
 
@@ -55,12 +56,12 @@ async def coin(ctx):
     """
     rand = random.randint(0,1)
     if (rand == 0):
-        await ctx.send("coin is on the head!")
+        await interaction.response.send_message("coin is on the head!")
     else:
-        await ctx.send("coin is on the tail!")
+        await interaction.response.send_message("coin is on the tail!")
 
-@client.command()
-async def dice(ctx):
+@tree.command(name="dice", description="roll a dice with 6 sides", guild=discord.Object(id = id))
+async def dice(interaction: discord.Interaction):
     """
     This command is a command to roll a dice with 6 sides
 
@@ -68,59 +69,35 @@ async def dice(ctx):
     Output: N/A
     """
     rand = random.randint(1, 6)
-    await ctx.send(f'You rolled {rand}!')
+    await interaction.response.send_message(f'You rolled {rand}!')
 
-@client.command()
-async def roll(ctx, arg):
+@tree.command(name="roll", description="generate a number between 1 to [arg] (Inclusive)", guild=discord.Object(id = id))
+async def roll(interaction: discord.Interaction, arg:int):
     """
     This command is a command to generate a number between 1 to [arg] (Inclusive)
 
     Input: ctx
     Output: N/A
     """
-    rand = random.randint(1, int(arg))
-    await ctx.send(f'You rolled {rand}!')
+    rand = random.randint(1, arg)
+    await interaction.response.send_message(f'You rolled {rand}!')
 
-@roll.error
-async def roll_error(ctx, error):
-    """
-    This function handles the error caused in .roll command
-
-    Input: ctx, error
-    Output: N/A
-    """
-    if isinstance(error, commands.BadArgument) or isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send('You have entered wrong parameters! Right format:')
-        await ctx.send('.roll *MAX_NUMBER*')
-    else:
-        await ctx.send('Please enter a number!')
-
-@client.command()
-async def remind(ctx, time:int, *, msg: str):
+@tree.command(name="remind", description="send [msg] after [time] seconds with a user ping", guild=discord.Object(id = id))
+async def remind(interaction: discord.Interaction, time:int, *, msg: str):
     """
     This command is a command to send [msg] after [time] seconds with a user ping
 
     Input: ctx, time, msg
     Output: N/A
     """
-    id = ctx.message.author.mention
+    
+    id = interaction.user.mention
     await asyncio.sleep(time)
     for i in range(3):
-        await ctx.send(f"{id} {msg}!")
+        await interaction.response.send_message(f"{id} {msg}!")
 
-@remind.error
-async def remind_error(ctx, error):
-    """
-    This function handles the error caused in .remind command
-
-    Input: ctx, error
-    Output: N/A
-    """
-    await ctx.send('You have entered wrong parameters! Right format:')
-    await ctx.send('.remind *SECONDS* *MESSAGE*')
-
-@client.command()
-async def remind_to(ctx, time:int, member:discord.Member, *, msg: str):
+@tree.command(name="remind_to", description="send [msg] to [member] with a user ping after [time] seconds", guild=discord.Object(id = id))
+async def remind_to(interaction: discord.Interaction, time:int, member:discord.Member, *, msg: str):
     """
     This command is a command to send [msg] to [member] with a user ping after [time] seconds
 
@@ -130,23 +107,12 @@ async def remind_to(ctx, time:int, member:discord.Member, *, msg: str):
     id = member.mention
     await asyncio.sleep(time)
     for i in range(3):
-        await ctx.send(f"{id} {msg}!")
-
-@remind_to.error
-async def remind_to_error(ctx, error):
-    """
-    This function handles the error caused in .remind_to command
-
-    Input: ctx, error
-    Output: N/A
-    """
-    await ctx.send('You have entered wrong parameters! Right format:')
-    await ctx.send('.remind_to *SECONDS* *USER* *MESSAGE*')
+        await interaction.response.send_message(f"{id} {msg}!")
 
 birthdays = {}
 
-@client.command()
-async def set_bday(ctx, month:int, day:int, user:discord.Member):
+@tree.command(name="set_bday", description="register a user's birthday", guild=discord.Object(id = id))
+async def set_bday(interaction: discord.Interaction, month:int, day:int, user:discord.Member):
     """
     This command is a command to register a user's birthday
 
@@ -156,10 +122,10 @@ async def set_bday(ctx, month:int, day:int, user:discord.Member):
     date_str = f'{month}/{day}'
     bday = datetime.strptime(date_str, '%m/%d').date()
     birthdays[user.id] = bday
-    await ctx.send(f"Successfully set {user.mention}'s birthday!")
+    await interaction.response.send_message(f"Successfully set {user.mention}'s birthday!")
 
-@client.command()
-async def remove_bday(ctx, user:discord.Member):
+@tree.command(name="remove_bday", description="remove registered user's birthday", guild=discord.Object(id = id))
+async def remove_bday(interaction: discord.Interaction, user:discord.Member):
     """
     This command is a command to remove registered user's birthday
 
@@ -168,13 +134,13 @@ async def remove_bday(ctx, user:discord.Member):
     """
     if user.id in birthdays:
         del birthdays[user.id]
-        await ctx.send(f"Successfully removed {user.mention}'s birthday!")
+        await interaction.response.send_message(f"Successfully removed {user.mention}'s birthday!")
     else:
-        await ctx.send("This user's birthday is not registered!")
+        await interaction.response.send_message("This user's birthday is not registered!")
         return 
 
-@client.command()
-async def check(ctx, user:discord.Member):
+@tree.command(name="check", description="check bday functionality", guild=discord.Object(id = id))
+async def check(interaction: discord.Interaction, user:discord.Member):
     """
     This is prototype function to check bday functionality
 
@@ -185,11 +151,11 @@ async def check(ctx, user:discord.Member):
     if user.id in birthdays:
         bday = birthdays[user.id]
         if (bday.month == now.month and bday.day == now.day):
-            await ctx.send(f"happy birthday to {user.mention}!")
+            await interaction.response.send_message(f"happy birthday to {user.mention}!")
         else:
-            await ctx.send("no birthday today")
+            await interaction.response.send_message("no birthday today")
     else:
-        await ctx.send("This user's birthday is not registered!")
+        await interaction.response.send_message("This user's birthday is not registered!")
 
 @check.error
 async def check_error(ctx, error):
@@ -206,4 +172,4 @@ async def bday_error(ctx, error):
     await ctx.send('You have entered wrong parameters! Right format:')
     await ctx.send('.set_bday *MONTH* *DAY* *USER*')
 
-client.run(Token.TOKEN)
+client.run(TOKEN)
