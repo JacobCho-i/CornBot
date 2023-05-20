@@ -1,6 +1,7 @@
 #REMINDER: ANOTHER FILE Token.py IS NEEDED TO RUN THIS
 import discord
 from discord import app_commands
+from discord.ext import tasks
 
 import random
 import asyncio
@@ -9,7 +10,10 @@ from datetime import datetime, time
 
 class aclient(discord.Client):
     def __init__(self):
-        super().__init__(intents=discord.Intents.default())
+        intent = discord.Intents.default()
+        intent.members = True
+        super().__init__(intents=intent)
+        
         self.synced = False
     
     async def on_ready(self):
@@ -17,24 +21,31 @@ class aclient(discord.Client):
         if not self.synced:
             await tree.sync(guild=discord.Object(id = guild_id))
             self.synced = True
+        check_bday.start()
         print("successfully logged in!")
 
 client = aclient()
 tree = app_commands.CommandTree(client)
 id = guild_id
-@client.event
-async def on_command_error(ctx, error):
-    """
-    This function is called upon the bot encounters error with commands
 
-    Input: ctx, error
-    Output: N/A
-    """
-    if isinstance(error, commands.CommandNotFound):
-        await ctx.send("Sorry, I didn't understand that command.")
-    else:
-        print(f"Error: {error}")
-
+@tasks.loop(seconds=10)
+async def check_bday():
+    time = datetime.now()
+    guild = client.get_guild(guild_id)
+    for id in birthdays:
+        user = await client.fetch_user(id)
+        member = guild.get_member(user.id)
+        if guild:
+            if member:
+                bday = birthdays[id]
+                if (time.month == bday.month and time.day == bday.day):
+                    if (time.hour == 2 and time.minute == 35):
+                        channel = guild.get_channel(928447198746804265)
+                        await channel.send(f'happy birthday @{member}')
+            else:
+                print('owo')
+        else:
+            print('guild does not exist')
 @tree.command(name="corn", description="prints out what this bot does", guild=discord.Object(id = id))
 async def corn(interaction: discord.Interaction):
     """
@@ -43,8 +54,8 @@ async def corn(interaction: discord.Interaction):
     Input: ctx
     Output: N/A
     """
-    await interaction.response.send_message("Hi this is corn bot with some cool functionalities:\nHere is some commands to try:\n.coin \n.dice\n", ephemeral=True)
-    await interaction.response.send_message("You can visit [this link](https://github.com/JacobCho-i/CornBot/blob/main/README.md) for a document with full commands!", ephemeral=True)
+    await interaction.response.send_message("Hi this is corn bot with some cool functionalities:\nHere is some commands to try:\n.coin \n.dice\nYou can visit (https://github.com/JacobCho-i/CornBot/blob/main/README.md) for a document with full commands!\n")
+    await interaction.response.send_message("")
 
 @tree.command(name="coin", description="flip a coin and sends the results", guild=discord.Object(id = id))
 async def coin(interaction: discord.Interaction):
@@ -147,6 +158,9 @@ async def check(interaction: discord.Interaction, user:discord.Member):
     Input: ctx, user
     Output: N/A
     """
+    for date in birthdays:
+        print(date)
+        print(birthdays[date])
     now = datetime.now()
     if user.id in birthdays:
         bday = birthdays[user.id]
