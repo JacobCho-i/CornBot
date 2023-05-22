@@ -30,22 +30,32 @@ id = guild_id
 
 @tasks.loop(seconds=10)
 async def check_bday():
+    """
+    This task runs in loop to send congratulation msg if time is 00:00 
+    and today is birthday of any users registered in the 'general' channel
+
+    Input: N/A
+    Output: N/A
+    """
     time = datetime.now()
     guild = client.get_guild(guild_id)
-    for id in birthdays:
-        user = await client.fetch_user(id)
-        member = guild.get_member(user.id)
-        if guild:
-            if member:
-                bday = birthdays[id]
-                if (time.month == bday.month and time.day == bday.day):
-                    if (time.hour == 2 and time.minute == 35):
-                        channel = guild.get_channel(928447198746804265)
-                        await channel.send(f'happy birthday @{member}')
+    try:
+        for id in birthdays:
+            user = await client.fetch_user(id)
+            member = guild.get_member(user.id)
+            if guild:
+                if member:
+                    bday = birthdays[id]
+                    if (time.month == bday.month and time.day == bday.day):
+                        if (time.hour == 1 and time.minute == 1 and time.second < 10):
+                            channel = discord.utils.get(guild.channels, name = 'general')
+                            general = guild.get_channel(channel.id)
+                            await general.send(f'happy birthday to {member.mention}!')
             else:
-                print('owo')
-        else:
-            print('guild does not exist')
+                print('guild does not exist')
+    except Exception as e:
+        print(e)
+
 @tree.command(name="corn", description="prints out what this bot does", guild=discord.Object(id = id))
 async def corn(interaction: discord.Interaction):
     """
@@ -149,31 +159,6 @@ async def remove_bday(interaction: discord.Interaction, user:discord.Member):
     else:
         await interaction.response.send_message("This user's birthday is not registered!")
         return 
-
-@tree.command(name="check", description="check bday functionality", guild=discord.Object(id = id))
-async def check(interaction: discord.Interaction, user:discord.Member):
-    """
-    This is prototype function to check bday functionality
-
-    Input: ctx, user
-    Output: N/A
-    """
-    for date in birthdays:
-        print(date)
-        print(birthdays[date])
-    now = datetime.now()
-    if user.id in birthdays:
-        bday = birthdays[user.id]
-        if (bday.month == now.month and bday.day == now.day):
-            await interaction.response.send_message(f"happy birthday to {user.mention}!")
-        else:
-            await interaction.response.send_message("no birthday today")
-    else:
-        await interaction.response.send_message("This user's birthday is not registered!")
-
-@check.error
-async def check_error(ctx, error):
-    print(error)
 
 @set_bday.error
 async def bday_error(ctx, error):
