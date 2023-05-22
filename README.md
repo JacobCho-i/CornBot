@@ -32,3 +32,11 @@ Command to send [MESSAGE] after [TIME] seconds with a user ping
 ## .remind_to
 Format: .remind_to [TIME] [USER] [MESSAGE] <br/>
 Command to send [MESSAGE] to [USER] with a user ping after [TIME] seconds
+
+## .set_bday
+Format: .set_bday [MONTH] [DAY] [USER] <br/> 
+Command to register a birthday for [USER]. If time is 00:00 and there is a birthday registered in for a user, the bot sends the congratulation message.
+
+## .remove_bday
+Format: .remove_bday [USER]
+Command to remove registered birthday for [USER]
