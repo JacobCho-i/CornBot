@@ -38,5 +38,5 @@ Format: .set_bday [MONTH] [DAY] [USER] <br/>
 Command to register a birthday for [USER]. If time is 00:00 and there is a birthday registered in for a user, the bot sends the congratulation message.
 
 ## .remove_bday
-Format: .remove_bday [USER]
+Format: .remove_bday [USER] <br/>
 Command to remove registered birthday for [USER]

@@ -3,10 +3,13 @@ import discord
 from discord import app_commands
 from discord.ext import tasks
 
-import random
 import asyncio
-from Token import TOKEN, guild_id
+import math
+import random
+
 from datetime import datetime, time 
+from Token import TOKEN, guild_id
+
 
 class aclient(discord.Client):
     def __init__(self):
@@ -27,6 +30,89 @@ class aclient(discord.Client):
 client = aclient()
 tree = app_commands.CommandTree(client)
 id = guild_id
+
+exp = {}
+cooldown = {}
+
+@client.event
+async def on_message(msg):
+    if msg.author.bot:
+        return
+    if msg.author.id in cooldown:
+        if cooldown[msg.author.id] == 1:
+            return
+    if msg.author.id in exp:
+        exp[msg.author.id] = exp[msg.author.id] + 1
+    else:
+        exp[msg.author.id] = 1
+    cooldown[msg.author.id] = 1
+    lvl = check_levelup(exp[msg.author.id])
+    if lvl < 0:
+        guild = client.get_guild(guild_id)
+        channel = discord.utils.get(guild.channels, name = 'general')
+        general = guild.get_channel(channel.id)
+        try:
+            role = discord.utils.get(guild.roles, name='level 1-10')
+            if lvl > 10 and lvl <= 20:
+                role = discord.utils.get(guild.roles, name='level 11-20')
+            if lvl > 20 and lvl <= 30:
+                role = discord.utils.get(guild.roles, name='level 21-30')
+            if role is not None:
+                await msg.author.add_roles(role)
+            else:
+                if lvl > 0 and lvl <= 10:
+                    new_role = await guild.create_role(name='level 1-10')
+                    await msg.author.add_roles(new_role)
+                if lvl > 10 and lvl <= 20:
+                    new_role = await guild.create_role(name='level 11-20')
+                    await msg.author.add_roles(new_role)
+                if lvl > 20 and lvl <= 30:
+                    new_role = await guild.create_role(name='level 21-30')
+                    await msg.author.add_roles(new_role)
+                
+            await general.send(f'{msg.author.mention} has leveled up to {-1 * lvl}!')
+        except Exception as e:
+            general.send('Please give me a permission to create/assign roles in server setting/role!')
+
+    await asyncio.sleep(30)
+    print(f'{msg.author.mention}s cooldown reset!')
+    cooldown[msg.author.id] = 0
+
+def check_levelup(exp):
+    level = 0
+    while exp > 0:
+        formula = int(3 * math.pow(level, 1.4))
+        if formula == 0:
+            formula = 3
+        exp -= formula
+        if exp > 0: 
+            level += 1
+        elif exp == 0:
+            level += 1
+            level *= -1
+            break
+    return level
+
+
+@tree.command(name="check_my_level", description="shows what level you are in this server", guild=discord.Object(id = id))
+async def check_my_level(interaction: discord.Interaction):
+    if interaction.user.id in exp:
+        experience = exp[interaction.user.id]
+        level = 0
+        while experience > 0:
+            formula = int(3 * math.pow(level, 1.4))
+            if formula == 0:
+                formula = 3
+            if formula > experience:
+                break
+            experience -= formula
+            if experience >= 0: 
+                level += 1
+            
+        await interaction.response.send_message(f"your level is {level} and {(experience / formula) * 100 : .2f}% towards the next level", ephemeral=True)
+    else:
+        await interaction.response.send_message(f"your level is level 0.", ephemeral=True)
+    
 
 @tasks.loop(seconds=10)
 async def check_bday():
