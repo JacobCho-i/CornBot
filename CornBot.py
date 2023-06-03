@@ -13,7 +13,7 @@ from Token import TOKEN, guild_id, host, password, name
 
 db = None
 cur = None
-backup_db = []
+backup_db = {}
 
 class aclient(discord.Client):
     def __init__(self):
@@ -62,6 +62,7 @@ class aclient(discord.Client):
         print("successfully logged in!")
 
 def setup_db():
+    #TODO: optimize code here
     db = mysql.connector.connect(
                                 host = host,
                                 user = name,
@@ -89,6 +90,35 @@ def setup_db():
             cur.execute(query)
             db.commit()
             print('table no exist, so we created one')
+    finally:
+        print('db closed')
+        db.close()
+    query = '''
+            SELECT *
+            FROM backup_servers
+            '''
+    db = mysql.connector.connect(
+                                host = host,
+                                user = name,
+                                passwd = password,
+                                database = 'user_db'
+                                )
+    cur = db.cursor()
+    try:
+        cur.execute(query)
+        for servers in cur:
+            backup_db[f'backup_{servers[0]}'] = servers[1]
+    except mysql.connector.Error as e:
+        print(e)
+        if e.errno == mysql.connector.errorcode.ER_NO_SUCH_TABLE:
+            query = '''
+                    CREATE TABLE backup_servers (
+                        name VARCHAR(50),
+                        guild_id BIGINT
+                    )
+                    '''
+            cur.execute(query)
+            db.commit()
     finally:
         print('db closed')
         db.close()
@@ -166,6 +196,8 @@ async def on_message(msg):
     #elif msg.embeds:
     #    print(msg.embeds)
     for database in backup_db:
+        if msg.guild.id != backup_db[database]:
+            continue
         print('check')
         db = mysql.connector.connect(
                                     host=host,
@@ -212,6 +244,33 @@ async def test(intereaction:discord.Interaction, db_name:str):
         print(msg)
     db.close()
 
+@tree.command(name="download_backup", guild=discord.Object(id = id))
+async def download_backup(interaction:discord.Interaction, db_name: str):
+    if db_name not in backup_db:
+        await interaction.response.send_message('that db does not exist')
+        return
+    db = mysql.connector.connect(host = host,
+                                    user = name,
+                                    passwd = password,
+                                    database = f'backup_{db_name}')
+    cur = db.cursor()
+    query = '''
+            SELECT * FROM Message
+            '''
+    cur.execute(query)
+    random_id = random.randint(0,10000000)
+    filename = f'server_backup_{db_name}_{random_id}.txt'  # Add file extension
+    with open(filename, 'w') as f:
+        for msg in cur:
+            f.write(f'{msg}\n')
+    
+    await interaction.response.send_message(
+        content='Here is the backup file:',
+        file=discord.File(filename)
+    )
+
+    f.close()
+    db.close()
 
 @tree.command(name="start_backup", 
               description="from now, observe all incoming message and store it on the database until stopped", 
@@ -237,6 +296,7 @@ async def start_backup(interaction: discord.Interaction, db_name: str):
             print('Created backup database!')
             db.commit()
             db.close()
+            asyncio.sleep(2)
             db = mysql.connector.connect(
                                         host=host,
                                         user=name,
@@ -252,8 +312,19 @@ async def start_backup(interaction: discord.Interaction, db_name: str):
                                 userid BIGINT)
                         """)
             db.commit()
+            db.close()
+            db = mysql.connector.connect(
+                                        host=host,
+                                        user=name,
+                                        passwd=password,
+                                        database='user_db')
+            cur = db.cursor()
+            cur.execute(f"""
+                            INSERT INTO backup_servers (name, guild_id) VALUES ('{db_name}', '{interaction.guild.id}')
+                        """)
+            db.commit()
             print('connected to backup db')
-            backup_db.append(f'backup_{db_name}')
+            backup_db[f'backup_{db_name}'] = guild_id
             db.close()
             await interaction.response.send_message('successfully created backup db')
         else:
