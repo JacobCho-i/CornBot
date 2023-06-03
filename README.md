@@ -55,3 +55,15 @@ Commands to let the user know how far they are in the progress towards to the ne
 ## /lottery
 Format: /lottery [TIME] <br/>
 Command to create a lottery event where it randomly selects a user who reacted to the message
+
+## /start_backup
+Format: /start_backup [NAME] <br/>
+Command to create and activate backup and leaves the log for incoming messages
+
+## /deactivate_backup
+Format: /deactivate_backup [NAME] <br/>
+Command to deactivate and stop the backup server from logging incoming message
+
+## /download_backup
+Format: /download_backup [NAME] <br/>
+Command to create a txt.file with all of the logs stored in the backup database

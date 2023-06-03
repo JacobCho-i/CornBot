@@ -29,31 +29,16 @@ class aclient(discord.Client):
             self.synced = True
         check_bday.start()
         try:
-            db = mysql.connector.connect(
-                                host = host,
-                                user = name,
-                                passwd = password,
-                                database = 'user_db'
-                                )
+            db = get_db(database='user_db')
             cur = db.cursor()
         except Exception as e:
             if e.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
-                db = mysql.connector.connect(
-                    host=host,
-                    user=name,
-                    passwd=password
-                )
+                db = get_db()
                 cur = db.cursor()
                 cur.execute("CREATE DATABASE user_db")
-                print('Created database!')
                 db.commit()
                 db.close()
-                db = mysql.connector.connect(
-                    host=host,
-                    user=name,
-                    passwd=password,
-                    database='user_db'
-                )
+                db = get_db(database='user_db')
                 cur = db.cursor()
             else:
                 print(e)
@@ -63,12 +48,7 @@ class aclient(discord.Client):
 
 def setup_db():
     #TODO: optimize code here
-    db = mysql.connector.connect(
-                                host = host,
-                                user = name,
-                                passwd = password,
-                                database = 'user_db'
-                                )
+    db = get_db(database = 'user_db')
     query = '''
             SELECT *
             FROM user_db
@@ -97,12 +77,7 @@ def setup_db():
             SELECT *
             FROM backup_servers
             '''
-    db = mysql.connector.connect(
-                                host = host,
-                                user = name,
-                                passwd = password,
-                                database = 'user_db'
-                                )
+    db = get_db(database = 'user_db')
     cur = db.cursor()
     try:
         cur.execute(query)
@@ -123,7 +98,27 @@ def setup_db():
         print('db closed')
         db.close()
     
-    
+def get_db(database:str=""):
+    """
+    This helper function retruns db
+
+    Input: db_name
+    outpt: db
+    """
+    db = None
+    if (str == ""):
+        db = db = mysql.connector.connect(
+                                host = host,
+                                user = name,
+                                passwd = password)
+        return db
+    db = mysql.connector.connect(
+                                host = host,
+                                user = name,
+                                passwd = password,
+                                database = database)
+    return db
+
 
 client = aclient()
 tree = app_commands.CommandTree(client)
@@ -186,6 +181,15 @@ async def on_message(msg):
 
 @client.event
 async def on_message(msg):
+    """
+    This event observes incoming messages and if there
+    is active backup_server, then leaves the log of 
+    each message if it matches with the guild_id provided
+    (Purposely made a separate function to distinguish each functions)
+
+    Input: msg
+    Output: N/A
+    """
     now = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     content = msg.content
     if content:
@@ -198,22 +202,22 @@ async def on_message(msg):
     for database in backup_db:
         if msg.guild.id != backup_db[database]:
             continue
-        print('check')
-        db = mysql.connector.connect(
-                                    host=host,
-                                    user=name,
-                                    passwd=password,
-                                    database=database)
+        db = get_db(database=database)
         cursor = db.cursor()
         query = f"INSERT INTO Message (user, msg, timeStr, msgid, userid) VALUES ('{msg.author}', '{msg.content}', '{now}', '{msg.id}', {msg.author.id})"
         cursor.execute(query)
         db.commit()
-        print('entered data')
         db.close()
 
 
 def check_levelup(exp):
     """
+    This is a helper function used for check_my_level()
+    to calculate the current level and progress until 
+    the next level.
+
+    Input: exp
+    Output: level
     """
     level = 0
     while exp > 0:
@@ -231,10 +235,10 @@ def check_levelup(exp):
 
 @tree.command(name="test", guild=discord.Object(id = id))
 async def test(intereaction:discord.Interaction, db_name:str):
-    db = mysql.connector.connect(host = host,
-                                    user = name,
-                                    passwd = password,
-                                    database = f'backup_{db_name}')
+    """
+    dummy command to test some features
+    """
+    db = get_db(database = f'backup_{db_name}')
     cur = db.cursor()
     query = '''
             SELECT * FROM Message
@@ -246,13 +250,17 @@ async def test(intereaction:discord.Interaction, db_name:str):
 
 @tree.command(name="download_backup", guild=discord.Object(id = id))
 async def download_backup(interaction:discord.Interaction, db_name: str):
+    """
+    This command sends a message with txt file attachment that has
+    user message logs since the back up was activated
+
+    Input: interaction, db_name
+    Output: N/A
+    """
     if db_name not in backup_db:
         await interaction.response.send_message('that db does not exist')
         return
-    db = mysql.connector.connect(host = host,
-                                    user = name,
-                                    passwd = password,
-                                    database = f'backup_{db_name}')
+    db = get_db(database = f'backup_{db_name}')
     cur = db.cursor()
     query = '''
             SELECT * FROM Message
@@ -276,11 +284,15 @@ async def download_backup(interaction:discord.Interaction, db_name: str):
               description="from now, observe all incoming message and store it on the database until stopped", 
               guild=discord.Object(id = id))
 async def start_backup(interaction: discord.Interaction, db_name: str):
+    """
+    This command activates the backup_server that store all the 
+    incoming messages once activated.
+
+    Input: interaction, db_name
+    output: N/A
+    """
     try:
-        db = mysql.connector.connect(host = host,
-                                    user = name,
-                                    passwd = password,
-                                    database = f'backup_{db_name}')
+        db = get_db(database = f'backup_{db_name}')
         cur = db.cursor()
         await interaction.response.send_message('this backup already exists!')
     except Exception as e:
@@ -297,11 +309,7 @@ async def start_backup(interaction: discord.Interaction, db_name: str):
             db.commit()
             db.close()
             asyncio.sleep(2)
-            db = mysql.connector.connect(
-                                        host=host,
-                                        user=name,
-                                        passwd=password,
-                                        database=f'backup_{db_name}')
+            db = get_db(database=f'backup_{db_name}')
             cur = db.cursor()
             cur.execute("""
                             CREATE TABLE Message(
@@ -313,17 +321,12 @@ async def start_backup(interaction: discord.Interaction, db_name: str):
                         """)
             db.commit()
             db.close()
-            db = mysql.connector.connect(
-                                        host=host,
-                                        user=name,
-                                        passwd=password,
-                                        database='user_db')
+            db = get_db(database='user_db')
             cur = db.cursor()
             cur.execute(f"""
                             INSERT INTO backup_servers (name, guild_id) VALUES ('{db_name}', '{interaction.guild.id}')
                         """)
             db.commit()
-            print('connected to backup db')
             backup_db[f'backup_{db_name}'] = guild_id
             db.close()
             await interaction.response.send_message('successfully created backup db')
