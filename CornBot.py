@@ -248,6 +248,29 @@ async def test(intereaction:discord.Interaction, db_name:str):
         print(msg)
     db.close()
 
+@tree.command(name="deactivate_backup", guild=discord.Object(id = id))
+async def deactivate_backup(interaction:discord.Interaction, db_name:str):
+    #TODO: Test this command
+    """
+    This command deactivates and stop the backup server from
+    logging incoming messages
+
+    Input: interaction, db_name
+    Output: N/A
+    """
+    if db_name not in backup_db:
+        await interaction.response.send_message('that db does not exist')
+        return
+    db = get_db(database = 'user_db')
+    cur = db.cursor()
+    query = f'''
+            DELETE FROM backup_servers
+            WHERE name = {db_name} AND guild_id = {guild_id}
+            '''
+    cur.execute(query)
+    db.commit()
+    db.close()
+
 @tree.command(name="download_backup", guild=discord.Object(id = id))
 async def download_backup(interaction:discord.Interaction, db_name: str):
     """
@@ -299,10 +322,7 @@ async def start_backup(interaction: discord.Interaction, db_name: str):
         print(e)
         if e.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
             print('hi')
-            db = mysql.connector.connect(
-                    host=host,
-                    user=name,
-                    passwd=password)
+            db = get_db()
             cur = db.cursor()
             cur.execute(f"CREATE DATABASE backup_{db_name}")
             print('Created backup database!')
