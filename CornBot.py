@@ -254,7 +254,6 @@ async def test(intereaction:discord.Interaction, db_name:str):
 
 @tree.command(name="deactivate_backup", guild=discord.Object(id = id))
 async def deactivate_backup(interaction:discord.Interaction, db_name:str):
-    #TODO: Test this command
     """
     This command deactivates and stop the backup server from
     logging incoming messages
@@ -378,7 +377,24 @@ async def start_backup(interaction: discord.Interaction, db_name: str):
     finally:
         db.close()
         
-
+@tree.command(name="give_role", 
+              description="grants a user the role. This command creates a role if a role with the given name does not exist", 
+              guild=discord.Object(id = id))
+async def give_role(interaction: discord.Interaction, user:discord.Member, role_name: str, color: str = None):
+    guild = client.get_guild(guild_id)
+    discord_color = discord.Colour(int(color, 16)) if color else None
+    try:
+        role = discord.utils.get(guild.roles, name= role_name)
+        if role is not None:
+            await role.edit(colour= discord_color)
+            await user.add_roles(role)
+        else:
+            new_role = await guild.create_role(name= role_name)
+            await new_role.edit(colour= discord_color)
+            await user.add_roles(new_role)
+        await interaction.response.send_message("Role was successfully granted")
+    except Exception as e:
+        await interaction.response.send_message(f"Error occured: {e}")
 
 @tree.command(name="create_vote", description="create a poll", guild=discord.Object(id = id))
 async def create_vote(interaction: discord.Interaction, time:int, 
