@@ -82,6 +82,7 @@ def setup_db():
     try:
         cur.execute(query)
         for servers in cur:
+            print(servers)
             backup_db[f'backup_{servers[0]}'] = servers[1]
     except mysql.connector.Error as e:
         print(e)
@@ -97,6 +98,7 @@ def setup_db():
     finally:
         print('db closed')
         db.close()
+    print(backup_db)
     
 def get_db(database:str=""):
     """
@@ -192,6 +194,8 @@ async def on_message(msg):
     """
     now = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     content = msg.content
+    if msg.author.bot:
+        return
     if content:
         print(f'author: {msg.author}, content: {content}, time: {now}, id: {msg.author.id}')
     elif msg.attachments:
@@ -258,18 +262,21 @@ async def deactivate_backup(interaction:discord.Interaction, db_name:str):
     Input: interaction, db_name
     Output: N/A
     """
-    if db_name not in backup_db:
+    name = f'backup_{db_name}'
+    if name not in backup_db:
         await interaction.response.send_message('that db does not exist')
         return
     db = get_db(database = 'user_db')
     cur = db.cursor()
     query = f'''
             DELETE FROM backup_servers
-            WHERE name = {db_name} AND guild_id = {guild_id}
+            WHERE name = %s AND guild_id = %s
             '''
-    cur.execute(query)
+    cur.execute(query, (db_name, guild_id))
+    del backup_db[f'{name}']
     db.commit()
     db.close()
+    await interaction.response.send_message('backup deactivated')
 
 @tree.command(name="download_backup", guild=discord.Object(id = id))
 async def download_backup(interaction:discord.Interaction, db_name: str):
@@ -280,28 +287,33 @@ async def download_backup(interaction:discord.Interaction, db_name: str):
     Input: interaction, db_name
     Output: N/A
     """
-    if db_name not in backup_db:
-        await interaction.response.send_message('that db does not exist')
-        return
-    db = get_db(database = f'backup_{db_name}')
-    cur = db.cursor()
-    query = '''
-            SELECT * FROM Message
-            '''
-    cur.execute(query)
-    random_id = random.randint(0,10000000)
-    filename = f'server_backup_{db_name}_{random_id}.txt'  # Add file extension
-    with open(filename, 'w') as f:
-        for msg in cur:
-            f.write(f'{msg}\n')
-    
-    await interaction.response.send_message(
-        content='Here is the backup file:',
-        file=discord.File(filename)
-    )
-
-    f.close()
-    db.close()
+    name = f'backup_{db_name}'
+    try:
+        db = get_db(database = name)
+        cur = db.cursor()
+        query = '''
+                SELECT * FROM Message
+                '''
+        cur.execute(query)
+        random_id = random.randint(0,10000000)
+        filename = f'server_backup_{db_name}_{random_id}.txt'  # Add file extension
+        with open(filename, 'w') as f:
+            for msg in cur:
+                f.write(f'{msg}\n')
+        
+        await interaction.response.send_message(
+            content='Here is the backup file:',
+            file=discord.File(filename)
+        )
+    except mysql.connector.Error as e:
+        if e.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
+            await interaction.response.send_message('that db does not exist')
+            return
+        else:
+            await interaction.response.send_message(f'error occured! {e}')
+    finally:
+        f.close()
+        db.close()
 
 @tree.command(name="start_backup", 
               description="from now, observe all incoming message and store it on the database until stopped", 
@@ -314,10 +326,21 @@ async def start_backup(interaction: discord.Interaction, db_name: str):
     Input: interaction, db_name
     output: N/A
     """
+    name = f'backup_{db_name}'
+    if name in backup_db:
+        await interaction.response.send_message('backup is already activated!')
+        return
     try:
         db = get_db(database = f'backup_{db_name}')
+        backup_db[f'backup_{db_name}'] = guild_id
+        db = get_db(database='user_db')
         cur = db.cursor()
-        await interaction.response.send_message('this backup already exists!')
+        cur.execute(f"""
+                    INSERT INTO backup_servers (name, guild_id) VALUES ('{db_name}', '{interaction.guild.id}')
+                    """)
+        db.commit()
+        await interaction.response.send_message('backup activated!')
+        return
     except Exception as e:
         print(e)
         if e.errno == mysql.connector.errorcode.ER_BAD_DB_ERROR:
